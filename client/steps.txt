@@ -1,0 +1,41 @@
+Step 1:  Create React with TypeScript template
+    npm create vite@latest . -- --template react-ts
+        Select a framework: React
+        Select a variant: TypeScript + SWC
+│       Use rolldown-vite (Experimental)?: No
+│       Install with npm and start now? No
+    npm install
+
+Step 2 : Install libraries (Socket + P2P)
+    npm install socket.io-client peerjs
+
+Step 3 : create .env : 
+            VITE_SERVER_URL=http://localhost:3001
+
+Step 4 : install tailwindcss 
+    npm install @tailwindcss/vite@next
+    in client\vite.config.ts : 
+        import { defineConfig } from 'vite'
+        import react from '@vitejs/plugin-react'
+        import tailwindcss from '@tailwindcss/vite' 
+
+        export default defineConfig({
+        plugins: [
+            react(),
+            tailwindcss(), 
+        ],
+        server: {
+            proxy: {
+            '/api': { 
+                target: 'http://localhost:3001', 
+                changeOrigin: true, 
+                secure: false 
+            },
+            }
+        }
+    })
+
+    in index.css : delete everything and write : 
+        @import "tailwindcss"
+    
+        

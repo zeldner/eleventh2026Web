@@ -1,0 +1,65 @@
+Step 1: Firebase Setup 
+	We need a "Service Account Key" to let our Node server talk to Firebase.
+	Go to the Firebase Console.
+	Create a project 
+	Go to Project Settings (Gear icon) -> Service accounts.
+	Click Generate new private key.
+	A file will download. Rename it to serviceAccountKey.json.
+	Keep this file ready. We will move it into the server folder soon.
+	Go to Firestore Database in the left menu -> Create Database -> Start in Test Mode
+
+Step 2 : Install Dependencies
+	npm init -y
+
+Step 3 :  Install logic libraries
+	npm install express cors socket.io firebase-admin
+
+Step 4 : Install TypeScript and Types (Dev Dependencies)
+	npm install -D typescript ts-node @types/node @types express @types/cors
+
+Step 5 :  Generate tsconfig.json
+	npx tsc --init
+
+Step 6 : install dotenv
+	npm install dotenv
+	add .env : 
+		PORT = 3001
+		CLIENT_URL=http://localhost:5173 
+
+Step 7 : Config Change (tsconfig.json): 
+	Open tsconfig.json and replace the entire content with : 
+
+	{
+  		// Visit https://aka.ms/tsconfig to read more about this file
+  		"compilerOptions": {
+    		/* Basic Options */
+    		"target": "es2016", /* Modern enough for Node.js LTS */
+    		"module": "commonjs", /* We use commonjs in Node.js */
+    		"rootDir": "./src" /* Where your source code is located */,
+    		"outDir": "./dist" /* Where the compiled code goes */,
+
+    		/* Critical settings for JSON and libraries */
+    		"esModuleInterop": true /* Allows importing commonjs modules */,
+    		"resolveJsonModule": true /* For options stored in JSON files */,
+    		"strict": true, /* for : all strict type-checking options */
+    		"skipLibCheck": true, /* Skip type checking of declaration files */
+    		"forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file */
+  		}
+	}
+
+Step 8: The Server Code (server/src/index.ts): 
+	Create a src folder, and inside it index.ts 
+
+Step 9 : Install Nodemon
+	npm install -D nodemon
+	in package.json : 
+		scripts": {
+  			"dev": "nodemon src/index.ts" 
+		}
+	"If" Nodemon doing problem with index.ts file:
+		 create file server/nodemon.json :
+		 	{
+  				"watch": ["src"],
+  				"ext": "ts,json",
+  				"exec": "ts-node src/index.ts"
+			}
