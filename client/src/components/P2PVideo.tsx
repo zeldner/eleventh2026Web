@@ -1,4 +1,4 @@
-// Ilya Zeldner - P2P Video (Fixed Local Stream Timing)
+// Ilya Zeldner - P2P Video (With End Call Button)
 import { useState, useEffect, useRef } from "react";
 import Peer from "peerjs";
 
@@ -7,6 +7,7 @@ export default function P2PVideo() {
   const [friendId, setFriendId] = useState<string>("");
   const [status, setStatus] = useState<string>("Offline");
   const [cameraActive, setCameraActive] = useState(false);
+  const [isConnected, setIsConnected] = useState(false); // State: Are we in a call?
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -42,6 +43,7 @@ export default function P2PVideo() {
     peer.on("error", (err) => {
       console.error("Peer Error:", err);
       setStatus("⚠️ Network Error");
+      setIsConnected(false);
     });
 
     return () => {
@@ -49,19 +51,22 @@ export default function P2PVideo() {
     };
   }, []);
 
-  // This waits for the 'cameraActive' state to change.
-  // Once the UI shows the video player, WE ATTACH THE STREAM.
+  // Attach stream when camera becomes active
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      console.log("Attaching stream to local video...");
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [cameraActive]);
-  // -----------------------------
 
   const handleCall = (call: any) => {
+    // 1. Close any existing call first
+    if (currentCallRef.current) {
+      currentCallRef.current.close();
+    }
+
     currentCallRef.current = call;
     setStatus("Connecting...");
+    setIsConnected(true); // Show the "Hang Up" button
 
     call.answer(localStreamRef.current!);
 
@@ -86,10 +91,19 @@ export default function P2PVideo() {
     }
   };
 
+  // THE HANG UP FUNCTION
+  const hangUp = () => {
+    if (currentCallRef.current) {
+      currentCallRef.current.close(); // Cut the connection
+    }
+    endCallUI(); // Reset the screen
+  };
+
   const endCallUI = () => {
     setStatus("Call Ended");
+    setIsConnected(false); // Switch back to "Call" button
     if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
+      remoteVideoRef.current.srcObject = null; // Black screen
     }
     currentCallRef.current = null;
   };
@@ -101,14 +115,8 @@ export default function P2PVideo() {
         video: true,
         audio: true,
       });
-
-      // Save stream to variable
       localStreamRef.current = stream;
-
-      // Trigger the UI update (shows the video player)
-      // The useEffect above will handle attaching the video!
-      setCameraActive(true);
-
+      setCameraActive(true); // Triggers the useEffect to attach video
       setStatus("Camera Ready ✅");
     } catch (err) {
       console.error("Camera Error", err);
@@ -172,13 +180,23 @@ export default function P2PVideo() {
 
       <div className="flex gap-2">
         {!cameraActive ? (
+          // STATE 1: Camera Off
           <button
             onClick={startCamera}
             className="w-full bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600 transition font-medium"
           >
             📸 Turn On Camera
           </button>
+        ) : isConnected ? (
+          // STATE 2: In a Call (Show Hang Up)
+          <button
+            onClick={hangUp}
+            className="w-full bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 transition font-medium animate-pulse"
+          >
+            📞 End Call
+          </button>
         ) : (
+          // STATE 3: Camera On, Ready to Call
           <>
             <input
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
