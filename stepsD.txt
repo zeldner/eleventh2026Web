@@ -1,0 +1,29 @@
+Step 1: Deploy Server to Render (The Backend) 
+    This runs our Node.js, Socket.io, and connects to Firebase.
+    Log in: Go to dashboard.render.com
+    New Service: Click New + ➔ Web Service.
+    Connect: Select "Build and deploy from a Git repository" and choose your repo.
+
+    Configure Settings:
+        Name: socket-server-demo
+        Region: Choose the one closest to you.
+        Branch: main/master.
+        Root Directory: server
+        Language: Node.
+        Build Command: npm install && npm run build (Assuming we are using TypeScript).
+        Start Command: npm start.
+        Instance Type: Free.
+        Add the Secret Key (Environment Variable):
+            Scroll down to Environment Variables.
+                Key: FIREBASE_SERVICE_ACCOUNT
+                Value: Open server/serviceAccountKey.json and Paste the entire JSON content into the Value box on Render.
+                Click "Add Environment Variable".
+        Deploy: Click Create Web Service.
+
+in server : add in package.json 
+    in "script" :
+        "build": "tsc"
+        "start": "node dist/index.js"
+When it finishes, look at the top left for your URL (e.g., https://socket-server-demo.onrender.com).
+
+COPY THIS URL.
