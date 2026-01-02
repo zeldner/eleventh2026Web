@@ -1,6 +1,6 @@
-// Ilya Zeldner - Professional P2P Video
+// Ilya Zeldner - P2P Video (Import Fixed)
 import { useState, useEffect, useRef } from "react";
-import Peer, { MediaConnection } from "peerjs";
+import Peer from "peerjs";
 
 export default function P2PVideo() {
   const [myId, setMyId] = useState<string>("");
@@ -12,9 +12,10 @@ export default function P2PVideo() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const currentCallRef = useRef<MediaConnection | null>(null);
 
-  // Initialize PeerJS (But NOT the camera yet)
+  // CHANGED: Use 'any' to bypass the missing type definition
+  const currentCallRef = useRef<any>(null);
+
   useEffect(() => {
     const peer = new Peer({
       config: {
@@ -32,9 +33,7 @@ export default function P2PVideo() {
       setStatus("Standby - Turn on Camera to Call");
     });
 
-    // Handle Incoming Calls
     peer.on("call", (call) => {
-      // If camera is off, we can't really answer with video yet
       if (!localStreamRef.current) {
         alert("Someone is calling! Please click 'Turn On Camera' first.");
         return;
@@ -52,15 +51,14 @@ export default function P2PVideo() {
     };
   }, []);
 
-  // HELPER: Handle the connection logic (Used for both Incoming & Outgoing)
-  const handleCall = (call: MediaConnection) => {
+  // CHANGED: Type is now 'any' to stop the error
+  const handleCall = (call: any) => {
     currentCallRef.current = call;
     setStatus("Connecting...");
 
-    // Answer with our stream
     call.answer(localStreamRef.current!);
 
-    call.on("stream", (remoteStream) => {
+    call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
@@ -70,28 +68,28 @@ export default function P2PVideo() {
       }
     });
 
-    // FIX: Handle Disconnects (Clean the screen)
     call.on("close", () => {
       endCallUI();
     });
 
-    // Also check ICE state for network drops
-    call.peerConnection.oniceconnectionstatechange = () => {
-      if (call.peerConnection.iceConnectionState === "disconnected") {
-        endCallUI();
-      }
-    };
+    // Check for network drops
+    if (call.peerConnection) {
+      call.peerConnection.oniceconnectionstatechange = () => {
+        if (call.peerConnection.iceConnectionState === "disconnected") {
+          endCallUI();
+        }
+      };
+    }
   };
 
   const endCallUI = () => {
     setStatus("Call Ended");
     if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null; // Clear the frozen frame
+      remoteVideoRef.current.srcObject = null;
     }
     currentCallRef.current = null;
   };
 
-  // USER ACTION: Turn On Camera
   const startCamera = async () => {
     try {
       setStatus("Accessing Camera...");
@@ -112,7 +110,6 @@ export default function P2PVideo() {
     }
   };
 
-  // USER ACTION: Call Friend
   const callPeer = () => {
     if (!peerRef.current || !friendId) return;
     if (!localStreamRef.current) {
@@ -134,7 +131,7 @@ export default function P2PVideo() {
 
       {/* VIDEO AREA */}
       <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4 flex items-center justify-center">
-        {/* Remote Video (Friend) */}
+        {/* Remote Video */}
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -142,14 +139,13 @@ export default function P2PVideo() {
           className="w-full h-full object-cover"
         />
 
-        {/* Placeholder Message if Video is Black */}
         {!cameraActive && (
           <div className="absolute text-white text-sm opacity-50">
             Camera is OFF
           </div>
         )}
 
-        {/* Small PIP - Only shows if camera is active */}
+        {/* My Video */}
         {cameraActive && (
           <div className="absolute bottom-3 right-3 w-24 h-32 bg-gray-800 rounded-lg border-2 border-white overflow-hidden shadow-lg z-10">
             <video
@@ -168,9 +164,7 @@ export default function P2PVideo() {
         {myId || "Generating ID..."}
       </div>
 
-      {/* CONTROLS */}
       <div className="flex gap-2">
-        {/* Step 1: Start Camera */}
         {!cameraActive ? (
           <button
             onClick={startCamera}
@@ -179,7 +173,6 @@ export default function P2PVideo() {
             📸 Turn On Camera
           </button>
         ) : (
-          /* Step 2: Call Interface (Only visible after camera is on) */
           <>
             <input
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
