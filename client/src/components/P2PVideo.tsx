@@ -5,8 +5,8 @@ import Peer from "peerjs";
 export default function P2PVideo() {
   const [myId, setMyId] = useState<string>("");
   const [friendId, setFriendId] = useState<string>("");
-  const [status, setStatus] = useState<string>("Offline");
-  const [cameraActive, setCameraActive] = useState(false);
+  const [status, setStatus] = useState<string>("Offline"); // State: Connection Status
+  const [cameraActive, setCameraActive] = useState(false); // State: Is the camera on?
   const [isConnected, setIsConnected] = useState(false); // State: Are we in a call?
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -16,28 +16,33 @@ export default function P2PVideo() {
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
+    // Initialize PeerJS when the component mounts (only once)
     const peer = new Peer({
+      // Initialize PeerJS with STUN servers
       config: {
+        // Use Google's and Twilio's public STUN servers
         iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:global.stun.twilio.com:3478" },
+          { urls: "stun:stun.l.google.com:19302" }, // Google's public STUN server
+          { urls: "stun:global.stun.twilio.com:3478" }, // Twilio's public STUN server
         ],
       },
     });
 
-    peerRef.current = peer;
+    peerRef.current = peer; // Store the peer instance in the ref variable
 
     peer.on("open", (id) => {
-      setMyId(id);
+      // Listen for 'open' event
+      setMyId(id); // Set the peer's ID
       setStatus("Standby - Turn on Camera to Call");
     });
 
     peer.on("call", (call) => {
+      // Listen for 'call' event
       if (!localStreamRef.current) {
         alert("Someone is calling! Please click 'Turn On Camera' first.");
         return;
       }
-      handleCall(call);
+      handleCall(call); // Handle the call event
     });
 
     peer.on("error", (err) => {
@@ -47,19 +52,19 @@ export default function P2PVideo() {
     });
 
     return () => {
-      peer.destroy();
+      peer.destroy(); // Clean up when the component unmounts
     };
   }, []);
 
   // Attach stream when camera becomes active
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.srcObject = localStreamRef.current; // Attach stream to video
     }
-  }, [cameraActive]);
+  }, [cameraActive]); // Re-run when cameraActive changes or localStream changes
 
   const handleCall = (call: any) => {
-    // 1. Close any existing call first
+    // Close any existing call first
     if (currentCallRef.current) {
       currentCallRef.current.close();
     }
@@ -68,24 +73,26 @@ export default function P2PVideo() {
     setStatus("Connecting...");
     setIsConnected(true); // Show the "Hang Up" button
 
-    call.answer(localStreamRef.current!);
+    call.answer(localStreamRef.current!); // Answer the call with the local stream
 
     call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
       if (remoteVideoRef.current) {
+        // Attach stream to video element if it exists
         remoteVideoRef.current.srcObject = remoteStream;
         remoteVideoRef.current
-          .play()
-          .catch((e) => console.error("Autoplay blocked", e));
+          .play() // Play the stream automatically (without user interaction)
+          .catch((e) => console.error("Autoplay blocked", e)); // Error handling
       }
     });
 
     call.on("close", () => endCallUI());
 
     if (call.peerConnection) {
+      // Check if peerConnection exists before adding event listener
       call.peerConnection.oniceconnectionstatechange = () => {
         if (call.peerConnection.iceConnectionState === "disconnected") {
-          endCallUI();
+          endCallUI(); // Reset the screen if the connection is lost
         }
       };
     }

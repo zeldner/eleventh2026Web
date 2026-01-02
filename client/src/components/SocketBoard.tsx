@@ -15,24 +15,24 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL);
 
 export default function SocketBoard() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Reference to the canvas
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d"); // Get the canvas context
     if (!ctx) return;
 
     // LISTEN: Server pushes drawing data
     socket.on("draw_line", (data: DrawData) => {
       ctx.fillStyle = data.color;
       ctx.beginPath();
-      ctx.arc(data.x, data.y, 3, 0, Math.PI * 2);
+      ctx.arc(data.x, data.y, 3, 0, Math.PI * 2); // Draw a small circle at the position from the server data (Shared by Mouse and Touch)
       ctx.fill();
     });
 
     return () => {
-      socket.off("draw_line");
+      socket.off("draw_line"); // Cleanup on unmount to avoid memory leaks
     };
   }, []);
 
@@ -41,7 +41,7 @@ export default function SocketBoard() {
     // Draw Locally
     ctx.fillStyle = "black";
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.arc(x, y, 3, 0, Math.PI * 2); // Draw a small circle at the position from the user input
     ctx.fill();
 
     // Send to Server
@@ -52,19 +52,19 @@ export default function SocketBoard() {
   const drawMouse = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.buttons !== 1) return; // Only draw if clicked
 
-    const canvas = canvasRef.current;
+    const canvas = canvasRef.current; // Get the canvas element from the ref
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const rect = canvas.getBoundingClientRect(); // Get the position of the canvas
+    const scaleX = canvas.width / rect.width; // Scale the position to fit the canvas
+    const scaleY = canvas.height / rect.height; // Scale the position to fit the canvas
 
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = (e.clientX - rect.left) * scaleX; // Get the position of the mouse on the canvas
+    const y = (e.clientY - rect.top) * scaleY; // Get the position of the mouse on the canvas
 
-    executeDraw(x, y, ctx);
+    executeDraw(x, y, ctx); // Draw the circle at the mouse position
   };
 
   // TOUCH Handler (For Phone/S-Pen)

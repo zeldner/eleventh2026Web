@@ -1,50 +1,56 @@
 // Ilya Zeldner
 import { useState, useEffect, useCallback } from "react";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001"; // Server URL
 
 // Type Definitions
 interface Message {
-  id: string;
-  text: string;
-  user: string;
+  // Chat Message
+  id: string; // Firebase ID
+  text: string; // Message Text
+  user: string; // User Name
 }
 // HTTP COMPONENT (The "Passive" Chat)
 
 export function HttpFirebaseChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+  // Chat Component
+  const [messages, setMessages] = useState<Message[]>([]); // Chat Messages
+  const [input, setInput] = useState<string>(""); // User Input
+  const [loading, setLoading] = useState<boolean>(false); // Loading State
 
   // FETCH: Get messages from DB
   const fetchMessages = useCallback(async () => {
-    setLoading(true);
+    // Manual Refresh
+    setLoading(true); // Set loading state
     try {
-      const res = await fetch(`${SERVER_URL}/api/chat`);
-      const data = await res.json();
-      setMessages(data);
+      const res = await fetch(`${SERVER_URL}/api/chat`); // HTTP GET
+      const data = await res.json(); // Parse JSON
+      setMessages(data); // Set messages
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("Fetch error:", err); // Error handling
     }
     setLoading(false);
   }, []);
 
   // SEND: Post new message to DB
   const sendMessage = async () => {
-    if (!input) return;
+    // HTTP POST
+    if (!input) return; // No empty messages
 
     await fetch(`${SERVER_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: input, user: "Student" }),
+      // HTTP POST
+      method: "POST", // HTTP Method
+      headers: { "Content-Type": "application/json" }, // Content-Type
+      body: JSON.stringify({ text: input, user: "Student" }), // Body
     });
 
-    setInput("");
+    setInput(""); // Clear input
     fetchMessages(); // Manual Refresh (Pull)
   };
 
   // CLEAR: Delete all messages (Self-Destruct)
   const clearChat = async () => {
+    // HTTP DELETE
     if (!confirm("Are you sure you want to delete all messages?")) return;
 
     try {
@@ -57,8 +63,8 @@ export function HttpFirebaseChat() {
 
   // Initial load
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    fetchMessages(); // Fetch messages
+  }, [fetchMessages]); // Depend on fetchMessages
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500 flex flex-col h-[500px]">
@@ -81,7 +87,7 @@ export function HttpFirebaseChat() {
             No messages yet
           </div>
         )}
-
+        {/* Display messages */}
         {messages.map((m) => (
           <div
             key={m.id}
