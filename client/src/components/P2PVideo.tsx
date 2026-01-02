@@ -1,4 +1,4 @@
-// Ilya Zeldner - P2P Video (Import Fixed)
+// Ilya Zeldner - P2P Video (Fixed Local Stream Timing)
 import { useState, useEffect, useRef } from "react";
 import Peer from "peerjs";
 
@@ -12,8 +12,6 @@ export default function P2PVideo() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-
-  // CHANGED: Use 'any' to bypass the missing type definition
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
@@ -51,7 +49,16 @@ export default function P2PVideo() {
     };
   }, []);
 
-  // CHANGED: Type is now 'any' to stop the error
+  // This waits for the 'cameraActive' state to change.
+  // Once the UI shows the video player, WE ATTACH THE STREAM.
+  useEffect(() => {
+    if (cameraActive && localStreamRef.current && localVideoRef.current) {
+      console.log("Attaching stream to local video...");
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [cameraActive]);
+  // -----------------------------
+
   const handleCall = (call: any) => {
     currentCallRef.current = call;
     setStatus("Connecting...");
@@ -68,11 +75,8 @@ export default function P2PVideo() {
       }
     });
 
-    call.on("close", () => {
-      endCallUI();
-    });
+    call.on("close", () => endCallUI());
 
-    // Check for network drops
     if (call.peerConnection) {
       call.peerConnection.oniceconnectionstatechange = () => {
         if (call.peerConnection.iceConnectionState === "disconnected") {
@@ -98,11 +102,13 @@ export default function P2PVideo() {
         audio: true,
       });
 
+      // Save stream to variable
       localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+
+      // Trigger the UI update (shows the video player)
+      // The useEffect above will handle attaching the video!
       setCameraActive(true);
+
       setStatus("Camera Ready ✅");
     } catch (err) {
       console.error("Camera Error", err);
