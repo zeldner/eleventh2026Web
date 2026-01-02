@@ -52,7 +52,7 @@ export function SocketBoard() {
     // Draw Locally (Black)
     ctx.fillStyle = "black";
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2); 
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
     ctx.fill();
 
     // Send to Server
