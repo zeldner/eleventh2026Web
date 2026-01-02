@@ -1,98 +1,121 @@
-// Ilya Zeldner - P2P COMPONENT (Video)
+// Ilya Zeldner - P2P Video (Fixed Scope Version)
 import { useState, useEffect, useRef } from "react";
 import Peer from "peerjs";
 
 export default function P2PVideo() {
   const [myId, setMyId] = useState<string>("Connecting...");
   const [friendId, setFriendId] = useState<string>("");
-  const [status, setStatus] = useState<string>("Idle");
+  const [status, setStatus] = useState<string>("Initializing...");
+  const [streamReady, setStreamReady] = useState(false);
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    // Pass the config object directly as the first argument
-    // PeerJS will automatically generate an ID.
-    const peer = new Peer({
-      config: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:global.stun.twilio.com:3478" },
-        ],
-      },
-    });
+    //  DEFINE SETUP FUNCTION INSIDE EFFECT
+    const setupPeer = (stream: MediaStream) => {
+      const peer = new Peer({
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:global.stun.twilio.com:3478" },
+          ],
+        },
+      });
 
-    peerRef.current = peer;
+      peerRef.current = peer;
 
-    peer.on("open", (id) => {
-      setMyId(id);
-      setStatus("Online - Ready to call");
-    });
-    peer.on("call", (call) => {
-      setStatus("Incoming call...");
-      navigator.mediaDevices
-        .getUserMedia({ video: true, audio: true })
-        .then((stream) => {
-          if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-          call.answer(stream);
-          call.on("stream", (remoteStream) => {
-            if (remoteVideoRef.current)
-              remoteVideoRef.current.srcObject = remoteStream;
-            setStatus("Connected! 🟢");
-          });
-        })
-        .catch((err) => {
-          console.error("Failed to get local stream", err);
-          setStatus("Camera Error 🔴");
+      peer.on("open", (id) => {
+        setMyId(id);
+        setStatus("✅ Online & Ready");
+      });
+
+      peer.on("call", (call) => {
+        setStatus("📞 Incoming Call...");
+        // Answer immediately with the stream we already have
+        call.answer(stream);
+
+        call.on("stream", (remoteStream) => {
+          setStatus("🟢 Connected! (Receiving Video)");
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current
+              .play()
+              .catch((e) => console.error("Auto-play error", e));
+          }
         });
-    });
+      });
+
+      peer.on("error", (err) => {
+        console.error("Peer Error:", err);
+        setStatus("⚠️ Connection Error");
+      });
+    };
+
+    // START CAMERA FIRST, THEN SETUP PEER
+    setStatus("Requesting Camera...");
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        // Save stream to ref so we can use it later for calling
+        localStreamRef.current = stream;
+
+        // Show myself
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        setStreamReady(true);
+        setStatus("Camera Ready. Connecting to Network...");
+
+        // NOW we can safely start the Peer connection
+        setupPeer(stream);
+      })
+      .catch((err) => {
+        console.error("Camera failed", err);
+        setStatus("❌ Camera Error: " + err.message);
+      });
 
     return () => {
-      // Cleanup: destroy peer when component unmounts
-      peer.destroy();
+      peerRef.current?.destroy();
     };
   }, []);
 
   const callPeer = () => {
     if (!peerRef.current || !friendId) return;
-    setStatus("Calling...");
+    if (!localStreamRef.current) {
+      setStatus("❌ Wait for camera first");
+      return;
+    }
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((stream) => {
-        // Show My Face
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+    setStatus("📞 Calling...");
+    const call = peerRef.current.call(friendId, localStreamRef.current);
 
-        const call = peerRef.current!.call(friendId, stream);
+    call.on("stream", (remoteStream) => {
+      setStatus("🟢 Connected! (Receiving Video)");
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current
+          .play()
+          .catch((e) => console.error("Auto-play error", e));
+      }
+    });
 
-        call.on("stream", (remoteStream) => {
-          if (remoteVideoRef.current)
-            remoteVideoRef.current.srcObject = remoteStream;
-          setStatus("Connected! 🟢");
-        });
+    call.on("error", (err) => setStatus("❌ Call Error: " + err.message));
+  };
 
-        call.on("error", (err) => {
-          console.error(err);
-          setStatus("Call Failed 🔴");
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to get local stream", err);
-        setStatus("Camera Error 🔴");
-      });
+  const forcePlay = () => {
+    if (remoteVideoRef.current) remoteVideoRef.current.play();
   };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-purple-500 flex flex-col h-[500px]">
-      <h2 className="text-xl font-bold mb-1">3. P2P (Video Stream) 🤝</h2>
-      <p className="text-xs text-gray-500 mb-4">
-        Status: <span className="font-bold">{status}</span>
+      <h2 className="text-xl font-bold mb-1">3. P2P Video 🤝</h2>
+      <p className="text-xs text-gray-500 mb-4 font-mono bg-gray-100 p-1 rounded">
+        {status}
       </p>
 
-      {/* Main Video Area */}
+      {/* VIDEO AREA */}
       <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4">
-        {/* Remote Video (Friend) */}
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -100,35 +123,47 @@ export default function P2PVideo() {
           className="w-full h-full object-cover"
         />
 
-        {/* Local Video - Small Picture-in-Picture */}
+        {/* Small Self-View */}
         <div className="absolute bottom-3 right-3 w-24 h-32 bg-gray-800 rounded-lg border-2 border-white overflow-hidden shadow-lg">
           <video
             ref={localVideoRef}
             autoPlay
             playsInline
-            muted // MUST be muted to avoid feedback and allow autoplay
-            className="w-full h-full object-cover transform -scale-x-100" // Mirror effect
+            muted
+            className="w-full h-full object-cover transform -scale-x-100"
           />
         </div>
+
+        <button
+          onClick={forcePlay}
+          className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded opacity-50 hover:opacity-100"
+        >
+          ▶ Force Play
+        </button>
       </div>
 
       <div className="bg-gray-100 p-3 rounded text-xs font-mono mb-3 break-all border border-gray-200">
-        <span className="font-bold text-gray-500 block uppercase">
-          My Peer ID:
-        </span>
+        <span className="font-bold text-gray-500 block uppercase">My ID:</span>
         {myId}
       </div>
 
       <div className="flex gap-2">
         <input
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
           value={friendId}
           onChange={(e) => setFriendId(e.target.value)}
           placeholder="Paste Friend's ID..."
         />
         <button
           onClick={callPeer}
-          className="bg-purple-500 text-white px-4 py-2 rounded text-sm hover:bg-purple-600 transition font-medium"
+          disabled={!streamReady}
+          className={`px-4 py-2 rounded text-sm text-white font-medium transition
+            ${
+              streamReady
+                ? "bg-purple-500 hover:bg-purple-600"
+                : "bg-gray-400 cursor-not-allowed"
+            }
+          `}
         >
           Call
         </button>
