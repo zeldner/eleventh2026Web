@@ -1,6 +1,6 @@
 // Ilya Zeldner
 import React, { useEffect, useRef } from "react";
-import { io } from "socket.io-client";
+import io from "socket.io-client";
 
 interface DrawData {
   x: number;
@@ -14,7 +14,6 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 // Initialize Socket connection once (outside component)
 const socket = io(SERVER_URL);
 
-// SOCKET COMPONENT (The "Active" Board)
 export default function SocketBoard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -37,7 +36,20 @@ export default function SocketBoard() {
     };
   }, []);
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // The actual drawing logic (Shared by Mouse and Touch)
+  const executeDraw = (x: number, y: number, ctx: CanvasRenderingContext2D) => {
+    // Draw Locally
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Send to Server
+    socket.emit("draw_line", { x, y, color: "blue" });
+  };
+
+  // MOUSE Handler (For PC)
+  const drawMouse = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.buttons !== 1) return; // Only draw if clicked
 
     const canvas = canvasRef.current;
@@ -46,23 +58,36 @@ export default function SocketBoard() {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-
-    // calculate how much the canvas is stretched (Internal Size / Visual Size)
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    // Multiply the mouse position by this scale to match the internal pixels
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    // Draw Locally (Black)
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fill();
+    executeDraw(x, y, ctx);
+  };
 
-    // Send to Server
-    socket.emit("draw_line", { x, y, color: "blue" });
+  // TOUCH Handler (For Phone/S-Pen)
+  const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // Prevent scrolling while drawing
+    // (touch-action: none' in CSS usually handles this, but this is safe)
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Get the position of the FIRST finger
+    const touch = e.touches[0];
+
+    const x = (touch.clientX - rect.left) * scaleX;
+    const y = (touch.clientY - rect.top) * scaleY;
+
+    executeDraw(x, y, ctx);
   };
 
   return (
@@ -73,7 +98,8 @@ export default function SocketBoard() {
       <div className="flex-1 relative border-2 border-dashed border-gray-300 rounded bg-gray-50 overflow-hidden">
         <canvas
           ref={canvasRef}
-          onMouseMove={draw}
+          onMouseMove={drawMouse} // PC
+          onTouchMove={drawTouch} // Phone
           width={400}
           height={400}
           className="cursor-crosshair w-full h-full touch-none"
