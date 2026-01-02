@@ -1,7 +1,7 @@
 // Ilya Zeldner
 import { HttpFirebaseChat } from "./components/HttpFirebaseChat";
 import SocketBoard from "./components/SocketBoard";
-import { P2PVideo } from "./components/P2PVideo";
+import P2PVideo from "./components/P2PVideo";
 
 function App() {
   return (
