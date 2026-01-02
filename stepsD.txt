@@ -24,6 +24,18 @@ in server : add in package.json
     in "script" :
         "build": "tsc"
         "start": "node dist/index.js"
-When it finishes, look at the top left for your URL (e.g., https://socket-server-demo.onrender.com).
 
-COPY THIS URL.
+Step 2: Deploy Client to Vercel (The Frontend) 
+    This hosts our React interface and tells it where to find the Render server.
+    Log in: Go to vercel.com/Add new Project.
+    Import: Find our GitHub repository and click Import.
+    Configure Project:
+        Framework Preset: Vite.
+        Root Directory: Click "Edit" ➔ Select the client folder.
+        Add the Server Link (Environment Variable):
+
+Click to expand Environment Variables.
+
+    Key: VITE_SERVER_URL
+    Value: Paste your Render URL (e.g., https://socket-server-demo.onrender.com).
+    Deploy: Click Deploy.

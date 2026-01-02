@@ -20,7 +20,7 @@ export function HttpFirebaseChat() {
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("${SERVER_URL}/api/chat");
+      const res = await fetch(`${SERVER_URL}/api/chat`);
       const data = await res.json();
       setMessages(data);
     } catch (err) {
@@ -33,7 +33,7 @@ export function HttpFirebaseChat() {
   const sendMessage = async () => {
     if (!input) return;
 
-    await fetch("${SERVER_URL}/api/chat", {
+    await fetch(`${SERVER_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: input, user: "Student" }),
@@ -48,7 +48,7 @@ export function HttpFirebaseChat() {
     if (!confirm("Are you sure you want to delete all messages?")) return;
 
     try {
-      await fetch("${SERVER_URL}/api/chat", { method: "DELETE" });
+      await fetch(`${SERVER_URL}/api/chat`, { method: "DELETE" });
       fetchMessages(); // Refresh to show empty list
     } catch (err) {
       console.error("Delete error:", err);
