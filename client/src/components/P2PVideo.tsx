@@ -1,110 +1,128 @@
-// Ilya Zeldner - P2P Video (Fixed Scope Version)
+// Ilya Zeldner - Professional P2P Video
 import { useState, useEffect, useRef } from "react";
-import Peer from "peerjs";
+import Peer, { MediaConnection } from "peerjs";
 
 export default function P2PVideo() {
-  const [myId, setMyId] = useState<string>("Connecting...");
+  const [myId, setMyId] = useState<string>("");
   const [friendId, setFriendId] = useState<string>("");
-  const [status, setStatus] = useState<string>("Initializing...");
-  const [streamReady, setStreamReady] = useState(false);
+  const [status, setStatus] = useState<string>("Offline");
+  const [cameraActive, setCameraActive] = useState(false);
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const currentCallRef = useRef<MediaConnection | null>(null);
 
+  // Initialize PeerJS (But NOT the camera yet)
   useEffect(() => {
-    //  DEFINE SETUP FUNCTION INSIDE EFFECT
-    const setupPeer = (stream: MediaStream) => {
-      const peer = new Peer({
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:global.stun.twilio.com:3478" },
-          ],
-        },
-      });
+    const peer = new Peer({
+      config: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:global.stun.twilio.com:3478" },
+        ],
+      },
+    });
 
-      peerRef.current = peer;
+    peerRef.current = peer;
 
-      peer.on("open", (id) => {
-        setMyId(id);
-        setStatus("✅ Online & Ready");
-      });
+    peer.on("open", (id) => {
+      setMyId(id);
+      setStatus("Standby - Turn on Camera to Call");
+    });
 
-      peer.on("call", (call) => {
-        setStatus("📞 Incoming Call...");
-        // Answer immediately with the stream we already have
-        call.answer(stream);
+    // Handle Incoming Calls
+    peer.on("call", (call) => {
+      // If camera is off, we can't really answer with video yet
+      if (!localStreamRef.current) {
+        alert("Someone is calling! Please click 'Turn On Camera' first.");
+        return;
+      }
+      handleCall(call);
+    });
 
-        call.on("stream", (remoteStream) => {
-          setStatus("🟢 Connected! (Receiving Video)");
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current
-              .play()
-              .catch((e) => console.error("Auto-play error", e));
-          }
-        });
-      });
-
-      peer.on("error", (err) => {
-        console.error("Peer Error:", err);
-        setStatus("⚠️ Connection Error");
-      });
-    };
-
-    // START CAMERA FIRST, THEN SETUP PEER
-    setStatus("Requesting Camera...");
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((stream) => {
-        // Save stream to ref so we can use it later for calling
-        localStreamRef.current = stream;
-
-        // Show myself
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        setStreamReady(true);
-        setStatus("Camera Ready. Connecting to Network...");
-
-        // NOW we can safely start the Peer connection
-        setupPeer(stream);
-      })
-      .catch((err) => {
-        console.error("Camera failed", err);
-        setStatus("❌ Camera Error: " + err.message);
-      });
+    peer.on("error", (err) => {
+      console.error("Peer Error:", err);
+      setStatus("⚠️ Network Error");
+    });
 
     return () => {
-      peerRef.current?.destroy();
+      peer.destroy();
     };
   }, []);
 
-  const callPeer = () => {
-    if (!peerRef.current || !friendId) return;
-    if (!localStreamRef.current) {
-      setStatus("❌ Wait for camera first");
-      return;
-    }
+  // HELPER: Handle the connection logic (Used for both Incoming & Outgoing)
+  const handleCall = (call: MediaConnection) => {
+    currentCallRef.current = call;
+    setStatus("Connecting...");
 
-    setStatus("📞 Calling...");
-    const call = peerRef.current.call(friendId, localStreamRef.current);
+    // Answer with our stream
+    call.answer(localStreamRef.current!);
 
     call.on("stream", (remoteStream) => {
-      setStatus("🟢 Connected! (Receiving Video)");
+      setStatus("🟢 Connected!");
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
         remoteVideoRef.current
           .play()
-          .catch((e) => console.error("Auto-play error", e));
+          .catch((e) => console.error("Autoplay blocked", e));
       }
     });
 
-    call.on("error", (err) => setStatus("❌ Call Error: " + err.message));
+    // FIX: Handle Disconnects (Clean the screen)
+    call.on("close", () => {
+      endCallUI();
+    });
+
+    // Also check ICE state for network drops
+    call.peerConnection.oniceconnectionstatechange = () => {
+      if (call.peerConnection.iceConnectionState === "disconnected") {
+        endCallUI();
+      }
+    };
   };
 
-  const forcePlay = () => {
-    if (remoteVideoRef.current) remoteVideoRef.current.play();
+  const endCallUI = () => {
+    setStatus("Call Ended");
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null; // Clear the frozen frame
+    }
+    currentCallRef.current = null;
+  };
+
+  // USER ACTION: Turn On Camera
+  const startCamera = async () => {
+    try {
+      setStatus("Accessing Camera...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+      setStatus("Camera Ready ✅");
+    } catch (err) {
+      console.error("Camera Error", err);
+      setStatus("❌ Camera Denied");
+    }
+  };
+
+  // USER ACTION: Call Friend
+  const callPeer = () => {
+    if (!peerRef.current || !friendId) return;
+    if (!localStreamRef.current) {
+      alert("Turn on your camera first!");
+      return;
+    }
+
+    setStatus("Calling...");
+    const call = peerRef.current.call(friendId, localStreamRef.current);
+    handleCall(call);
   };
 
   return (
@@ -115,7 +133,8 @@ export default function P2PVideo() {
       </p>
 
       {/* VIDEO AREA */}
-      <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4">
+      <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4 flex items-center justify-center">
+        {/* Remote Video (Friend) */}
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -123,50 +142,59 @@ export default function P2PVideo() {
           className="w-full h-full object-cover"
         />
 
-        {/* Small Self-View */}
-        <div className="absolute bottom-3 right-3 w-24 h-32 bg-gray-800 rounded-lg border-2 border-white overflow-hidden shadow-lg">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover transform -scale-x-100"
-          />
-        </div>
+        {/* Placeholder Message if Video is Black */}
+        {!cameraActive && (
+          <div className="absolute text-white text-sm opacity-50">
+            Camera is OFF
+          </div>
+        )}
 
-        <button
-          onClick={forcePlay}
-          className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded opacity-50 hover:opacity-100"
-        >
-          ▶ Force Play
-        </button>
+        {/* Small PIP - Only shows if camera is active */}
+        {cameraActive && (
+          <div className="absolute bottom-3 right-3 w-24 h-32 bg-gray-800 rounded-lg border-2 border-white overflow-hidden shadow-lg z-10">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover transform -scale-x-100"
+            />
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-100 p-3 rounded text-xs font-mono mb-3 break-all border border-gray-200">
         <span className="font-bold text-gray-500 block uppercase">My ID:</span>
-        {myId}
+        {myId || "Generating ID..."}
       </div>
 
+      {/* CONTROLS */}
       <div className="flex gap-2">
-        <input
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-          value={friendId}
-          onChange={(e) => setFriendId(e.target.value)}
-          placeholder="Paste Friend's ID..."
-        />
-        <button
-          onClick={callPeer}
-          disabled={!streamReady}
-          className={`px-4 py-2 rounded text-sm text-white font-medium transition
-            ${
-              streamReady
-                ? "bg-purple-500 hover:bg-purple-600"
-                : "bg-gray-400 cursor-not-allowed"
-            }
-          `}
-        >
-          Call
-        </button>
+        {/* Step 1: Start Camera */}
+        {!cameraActive ? (
+          <button
+            onClick={startCamera}
+            className="w-full bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600 transition font-medium"
+          >
+            📸 Turn On Camera
+          </button>
+        ) : (
+          /* Step 2: Call Interface (Only visible after camera is on) */
+          <>
+            <input
+              className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              value={friendId}
+              onChange={(e) => setFriendId(e.target.value)}
+              placeholder="Friend's ID..."
+            />
+            <button
+              onClick={callPeer}
+              className="bg-purple-500 text-white px-4 py-2 rounded text-sm hover:bg-purple-600 transition font-medium"
+            >
+              Call
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
