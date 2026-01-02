@@ -47,7 +47,7 @@ if (serviceAccount && !admin.apps.length) {
 }
 const db = admin.firestore();
 
-// 3. Create Server
+// Create Server
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {

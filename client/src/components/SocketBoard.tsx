@@ -1,6 +1,6 @@
 // Ilya Zeldner
 import React, { useEffect, useRef } from "react";
-import io from "socket.io-client";
+import { io } from "socket.io-client";
 
 interface DrawData {
   x: number;
@@ -15,7 +15,7 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL);
 
 // SOCKET COMPONENT (The "Active" Board)
-export function SocketBoard() {
+export default function SocketBoard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -46,8 +46,14 @@ export function SocketBoard() {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+
+    // calculate how much the canvas is stretched (Internal Size / Visual Size)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Multiply the mouse position by this scale to match the internal pixels
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     // Draw Locally (Black)
     ctx.fillStyle = "black";
