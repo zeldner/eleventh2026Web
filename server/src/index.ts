@@ -77,7 +77,6 @@ app.get("/", (_req, res) => {
   res.send(`
         <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
             <h1 style="color: #2ecc71;">🚀 Server: ONLINE</h1>
-            <p>Targeting Frontend: <strong>${CLIENT_URL}</strong></p>
         </div>
     `);
 }); // ROOT page for testing
