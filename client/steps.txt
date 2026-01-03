@@ -38,4 +38,12 @@ Step 4 : install tailwindcss
     in index.css : delete everything and write : 
         @import "tailwindcss"
     
+How the Google Video Chat (WebRTC) Works : 
+    We are using WebRTC (Web Real-Time Communication) and the PeerJS library.
+    Usually, data goes from user a server, and then to our friend. That’s slow. For the Video Chat, we use P2P (Peer-to-Peer).
+    The Handshake: First, both students talk to our Render server just to 'find' each other’s address.
+    The Direct Link: Once they find each other, they stop talking to the server and connect their cameras directly to each other.  It’s the fastest way to stream video with zero lag."
+
+Explanation for the S-Pen/Touc:
+    We used Vercel specifically because it handles Vite projects so well. Vite optimizes our drawing code so it's light enough to run smoothly even on a users phone or tablet with an S-Pen."
         

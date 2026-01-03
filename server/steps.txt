@@ -63,3 +63,14 @@ Step 9 : Install Nodemon
   				"ext": "ts,json",
   				"exec": "ts-node src/index.ts"
 			}
+
+
+(The "Mirror" Technique)
+The Concept: Normally, browsers block a website (Vercel) from talking to a different server (Render) for security. This is called CORS (Cross-Origin Resource Sharing).
+
+We built a Smart Mirror. When our browser knocks on our server's door, the server looks at the 'Passport' (the Origin header), sees it's our Vercel site, and immediately mirrors that name back to the guard saying, 'Yes, this is allowed!' This way, the server works for our local computers and the live website at the same time without us changing the code."
+
+How the "Ping" Works (The "Espresso Shot")
+The Concept: Free servers like Render go to "sleep" after 15 minutes of inactivity to save electricity. When the first user  joins, they have to wait 30 seconds for the server to "wake up," which looks like a bug.
+
+"Our server is on a free plan, so it likes to take naps. To keep it awake , we programmed a Self-Ping. Every 13 minutes, the server actually sends a 'text message' to itself. Because it stays 'busy' talking to itself, it never naps, and it’s always ready for us to draw on the board instantly."

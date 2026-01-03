@@ -39,3 +39,17 @@ Click to expand Environment Variables.
     Key: VITE_SERVER_URL
     Value: Paste your Render URL (e.g., https://socket-server-demo.onrender.com).
     Deploy: Click Deploy.
+
+Why Vercel for the Frontend?
+    Our Frontend is just a collection of 'static' files (HTML, CSS, JS). Vercel copies these files to servers all over the world (Edge Network). If a user is in Israel, they get the files from a server in Israel. If they are in the USA, they get them from the USA. It makes the website load instantly for everyone, everywhere."
+    Benefit: Speed and "Global Presence."
+    The Industry Term: CDN (Content Delivery Network).
+
+Why Render for the Backend?
+    "While Vercel is great at giving out files, Render is great at 'thinking.' Our Backend is a living program that needs to stay running to manage the Socket.io connections (for the drawing board) and talk to Firebase. Unlike Vercel, which 'goes to sleep' to save energy, Render allows us to have a 'Persistent Server'  that stays awake and keeps the conversation between users alive."
+    Benefit: Ability to handle long-running "stateful" connections (WebSockets).
+    The Industry Term: PaaS (Platform as a Service).
+
+ Summary : 
+    We use Vercel to deliver the 'look' of the app very fast, and we use Render to provide the 'intelligence' and real-time power. By splitting them up, if the backend crashes, the website still loads. If the website is busy, the backend doesn't slow down. They work together as a team.
+
