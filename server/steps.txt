@@ -64,6 +64,8 @@ Step 9 : Install Nodemon
   				"exec": "ts-node src/index.ts"
 			}
 
+npm install peer
+
 
 (The "Mirror" Technique)
 The Concept: Normally, browsers block a website (Vercel) from talking to a different server (Render) for security. This is called CORS (Cross-Origin Resource Sharing).

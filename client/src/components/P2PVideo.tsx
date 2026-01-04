@@ -1,13 +1,13 @@
-// Ilya Zeldner - P2P Video (With End Call Button)
+// Ilya Zeldner - P2P Video
 import { useState, useEffect, useRef } from "react";
 import Peer from "peerjs";
 
 export default function P2PVideo() {
   const [myId, setMyId] = useState<string>("");
   const [friendId, setFriendId] = useState<string>("");
-  const [status, setStatus] = useState<string>("Offline"); // State: Connection Status
-  const [cameraActive, setCameraActive] = useState(false); // State: Is the camera on?
-  const [isConnected, setIsConnected] = useState(false); // State: Are we in a call?
+  const [status, setStatus] = useState<string>("Offline");
+  const [cameraActive, setCameraActive] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -16,110 +16,94 @@ export default function P2PVideo() {
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
-    // Updated PeerJS configuration with STUN servers for mobile connectivity
+    // CONFIGURATION
+    const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
-    // Using an empty string ('') as the first argument allows PeerJS to
-    // automatically generate a unique ID while satisfying TypeScript's string requirement.
+    const cleanHost = rawUrl
+      .replace(/^https?:\/\//, "")
+      .split("/")[0]
+      .split(":")[0]; // Remove protocol and path
+    const portMatch = rawUrl.match(/:(\d+)/); // Match port number
+    const port = portMatch ? parseInt(portMatch[1]) : 443; // Default to 443
+    const isSecure = rawUrl.startsWith("https"); // Check for secure connection
+
+    console.log(`Connecting to PeerServer at ${cleanHost}:${port}`);
+
+    // 2. PEER INITIALIZATION
+    // We match the backend mount point: app.use("/peerjs")
     const peer = new Peer("", {
-      host: "your-app-name.onrender.com", // Your Render backend URL
-      secure: true, // Required for HTTPS/Production
-      port: 443, // Standard port for HTTPS
+      host: cleanHost,
+      port: port,
+      secure: isSecure,
+      path: "/peerjs", // Matches the backend route exactly
       config: {
         iceServers: [
-          // STUN servers act as a "mirror" to help the device discover its
-          // public IP address, which is crucial for bypassing mobile firewalls.
-          { urls: "stun:stun.l.google.com:19302" }, // Google's STUN server for mobile
-          { urls: "stun:stun1.l.google.com:19302" }, // Google's STUN server for mobile
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
         ],
-        // Increases the number of potential connection paths to improve reliability
-        iceCandidatePoolSize: 10,
       },
     });
 
-    peerRef.current = peer; // Store the peer instance in the ref variable
+    peerRef.current = peer;
 
     peer.on("open", (id) => {
-      // Listen for 'open' event
-      setMyId(id); // Set the peer's ID
+      setMyId(id);
       setStatus("Standby - Turn on Camera to Call");
+      console.log("✅ Success! My Peer ID:", id);
     });
 
     peer.on("call", (call) => {
-      // Listen for 'call' event
       if (!localStreamRef.current) {
         alert("Someone is calling! Please click 'Turn On Camera' first.");
         return;
       }
-      handleCall(call); // Handle the call event
+      handleCall(call);
     });
 
     peer.on("error", (err) => {
-      console.error("Peer Error:", err);
+      console.error("❌ PeerJS Error:", err.type, err);
       setStatus("⚠️ Network Error");
       setIsConnected(false);
     });
 
     return () => {
-      peer.destroy(); // Clean up when the component unmounts
+      peer.destroy();
     };
   }, []);
 
-  // Attach stream when camera becomes active
+  // UI & CAMERA LOGIC (Unchanged)
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current; // Attach stream to video
+      localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [cameraActive]); // Re-run when cameraActive changes or localStream changes
+  }, [cameraActive]);
 
   const handleCall = (call: any) => {
-    // Close any existing call first
-    if (currentCallRef.current) {
-      currentCallRef.current.close();
-    }
-
+    if (currentCallRef.current) currentCallRef.current.close();
     currentCallRef.current = call;
     setStatus("Connecting...");
-    setIsConnected(true); // Show the "Hang Up" button
+    setIsConnected(true);
 
-    call.answer(localStreamRef.current!); // Answer the call with the local stream
-
+    call.answer(localStreamRef.current!);
     call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
       if (remoteVideoRef.current) {
-        // Attach stream to video element if it exists
         remoteVideoRef.current.srcObject = remoteStream;
-        remoteVideoRef.current
-          .play() // Play the stream automatically (without user interaction)
-          .catch((e) => console.error("Autoplay blocked", e)); // Error handling
+        remoteVideoRef.current.play().catch(console.error);
       }
     });
-
     call.on("close", () => endCallUI());
-
-    if (call.peerConnection) {
-      // Check if peerConnection exists before adding event listener
-      call.peerConnection.oniceconnectionstatechange = () => {
-        if (call.peerConnection.iceConnectionState === "disconnected") {
-          endCallUI(); // Reset the screen if the connection is lost
-        }
-      };
-    }
   };
 
-  // THE HANG UP FUNCTION
   const hangUp = () => {
-    if (currentCallRef.current) {
-      currentCallRef.current.close(); // Cut the connection
-    }
-    endCallUI(); // Reset the screen
+    if (currentCallRef.current) currentCallRef.current.close();
+    endCallUI();
   };
 
   const endCallUI = () => {
     setStatus("Call Ended");
-    setIsConnected(false); // Switch back to "Call" button
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null; // Black screen
-    }
+    setIsConnected(false);
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     currentCallRef.current = null;
   };
 
@@ -131,11 +115,11 @@ export default function P2PVideo() {
         audio: true,
       });
       localStreamRef.current = stream;
-      setCameraActive(true); // Triggers the useEffect to attach video
+      setCameraActive(true);
       setStatus("Camera Ready ✅");
     } catch (err) {
-      console.error("Camera Error", err);
-      setStatus("❌ Camera Denied");
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setStatus("❌ Camera Denied" + errorMessage);
     }
   };
 
@@ -145,7 +129,6 @@ export default function P2PVideo() {
       alert("Turn on your camera first!");
       return;
     }
-
     setStatus("Calling...");
     const call = peerRef.current.call(friendId, localStreamRef.current);
     handleCall(call);
@@ -158,23 +141,18 @@ export default function P2PVideo() {
         {status}
       </p>
 
-      {/* VIDEO AREA */}
       <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4 flex items-center justify-center">
-        {/* Remote Video */}
         <video
           ref={remoteVideoRef}
           autoPlay
           playsInline
           className="w-full h-full object-cover"
         />
-
         {!cameraActive && (
           <div className="absolute text-white text-sm opacity-50">
             Camera is OFF
           </div>
         )}
-
-        {/* My Video */}
         {cameraActive && (
           <div className="absolute bottom-3 right-3 w-24 h-32 bg-gray-800 rounded-lg border-2 border-white overflow-hidden shadow-lg z-10">
             <video
@@ -195,7 +173,6 @@ export default function P2PVideo() {
 
       <div className="flex gap-2">
         {!cameraActive ? (
-          // STATE 1: Camera Off
           <button
             onClick={startCamera}
             className="w-full bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600 transition font-medium"
@@ -203,7 +180,6 @@ export default function P2PVideo() {
             📸 Turn On Camera
           </button>
         ) : isConnected ? (
-          // STATE 2: In a Call (Show Hang Up)
           <button
             onClick={hangUp}
             className="w-full bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 transition font-medium animate-pulse"
@@ -211,7 +187,6 @@ export default function P2PVideo() {
             📞 End Call
           </button>
         ) : (
-          // STATE 3: Camera On, Ready to Call
           <>
             <input
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
