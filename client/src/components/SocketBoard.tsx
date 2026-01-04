@@ -27,8 +27,6 @@ if (cleanHost === "localhost") {
 
 // STRICT SOCKET CONFIGURATION
 const socket = io(CONNECT_URL, {
-  // 🔥 WEBSOCKETS ONLY
-  transports: ["websocket"],
   withCredentials: true,
   autoConnect: true,
 });

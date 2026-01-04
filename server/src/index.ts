@@ -30,7 +30,6 @@ if (isProduction) {
       origin: (origin, callback) => callback(null, true),
       credentials: true,
     },
-    transports: ["websocket"], // (Pure Socket)
   });
 } else {
   console.log("💻 Local Mode: Socket.io on dedicated Port 3002");
