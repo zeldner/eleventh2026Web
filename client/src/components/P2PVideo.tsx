@@ -16,15 +16,23 @@ export default function P2PVideo() {
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
-    // Initialize PeerJS when the component mounts (only once)
-    const peer = new Peer({
-      // Initialize PeerJS with STUN servers
+    // Updated PeerJS configuration with STUN servers for mobile connectivity
+
+    // Using an empty string ('') as the first argument allows PeerJS to
+    // automatically generate a unique ID while satisfying TypeScript's string requirement.
+    const peer = new Peer("", {
+      host: "your-app-name.onrender.com", // Your Render backend URL
+      secure: true, // Required for HTTPS/Production
+      port: 443, // Standard port for HTTPS
       config: {
-        // Use Google's and Twilio's public STUN servers
         iceServers: [
-          { urls: "stun:stun.l.google.com:19302" }, // Google's public STUN server
-          { urls: "stun:global.stun.twilio.com:3478" }, // Twilio's public STUN server
+          // STUN servers act as a "mirror" to help the device discover its
+          // public IP address, which is crucial for bypassing mobile firewalls.
+          { urls: "stun:stun.l.google.com:19302" }, // Google's STUN server for mobile
+          { urls: "stun:stun1.l.google.com:19302" }, // Google's STUN server for mobile
         ],
+        // Increases the number of potential connection paths to improve reliability
+        iceCandidatePoolSize: 10,
       },
     });
 
