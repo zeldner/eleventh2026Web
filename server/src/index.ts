@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// SOCKET.IO (INITIALIZE FIRST!) ---
+// SOCKET.IO (INITIALIZE FIRST!)
 // We MUST initialize this before PeerJS so
 // it handles the 'upgrade' event first.
 let io: Server;
@@ -50,6 +50,7 @@ const peerServer = ExpressPeerServer(server, {
   path: "/",
   allow_discovery: true,
 } as any);
+
 app.use("/peerjs", peerServer);
 
 // FIREBASE

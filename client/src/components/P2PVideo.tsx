@@ -16,41 +16,47 @@ export default function P2PVideo() {
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
-    // CONFIGURATION
+    // CONFIGURATION LOGIC
     const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
+    // Extract Hostname (e.g., "myapp.onrender.com" or "localhost")
     const cleanHost = rawUrl
       .replace(/^https?:\/\//, "")
       .split("/")[0]
       .split(":")[0]; // Remove protocol and path
-    const portMatch = rawUrl.match(/:(\d+)/); // Match port number
-    const port = portMatch ? parseInt(portMatch[1]) : 443; // Default to 443
-    const isSecure = rawUrl.startsWith("https"); // Check for secure connection
 
-    console.log(`Connecting to PeerServer at ${cleanHost}:${port}`);
+    const isSecure = rawUrl.startsWith("https");
 
-    // 2. PEER INITIALIZATION
-    // We match the backend mount point: app.use("/peerjs")
+    // On Render (HTTPS), we MUST use Port 443.
+    // On Localhost, we use the port in the URL (3001).
+    const portMatch = rawUrl.match(/:(\d+)/);
+    const port = isSecure ? 443 : portMatch ? parseInt(portMatch[1]) : 3001;
+
+    console.log(
+      `Connecting to PeerServer at ${cleanHost}:${port} (Secure: ${isSecure})`
+    );
+
+    // PEER INITIALIZATION
     const peer = new Peer("", {
       host: cleanHost,
       port: port,
       secure: isSecure,
-      path: "/peerjs", // Matches the backend route exactly
+      path: "/peerjs",
       config: {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
         ],
       },
-    });
+    }); // PeerJS Instance
 
-    peerRef.current = peer;
+    peerRef.current = peer; // Store PeerJS Instance in Ref
 
     peer.on("open", (id) => {
       setMyId(id);
       setStatus("Standby - Turn on Camera to Call");
       console.log("✅ Success! My Peer ID:", id);
-    });
+    }); // Peer ID is Ready
 
     peer.on("call", (call) => {
       if (!localStreamRef.current) {
@@ -58,12 +64,16 @@ export default function P2PVideo() {
         return;
       }
       handleCall(call);
-    });
+    }); // Incoming Call Event
 
     peer.on("error", (err) => {
-      console.error("❌ PeerJS Error:", err.type, err);
-      setStatus("⚠️ Network Error");
-      setIsConnected(false);
+      console.error("❌ PeerJS Error:", err.type, err); // Error handling
+      if (err.type === "peer-unavailable") {
+        setStatus("⚠️ Friend ID not found");
+      } else {
+        setStatus("⚠️ Network Error");
+        setIsConnected(false);
+      }
     });
 
     return () => {
@@ -71,18 +81,18 @@ export default function P2PVideo() {
     };
   }, []);
 
-  // UI & CAMERA LOGIC (Unchanged)
+  // UI & CAMERA LOGIC
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [cameraActive]);
+  }, [cameraActive]); // Toggle Camera
 
   const handleCall = (call: any) => {
     if (currentCallRef.current) currentCallRef.current.close();
     currentCallRef.current = call;
     setStatus("Connecting...");
-    setIsConnected(true);
+    setIsConnected(true); // UI Update
 
     call.answer(localStreamRef.current!);
     call.on("stream", (remoteStream: MediaStream) => {
@@ -93,19 +103,19 @@ export default function P2PVideo() {
       }
     });
     call.on("close", () => endCallUI());
-  };
+  }; // Incoming Call
 
   const hangUp = () => {
     if (currentCallRef.current) currentCallRef.current.close();
     endCallUI();
-  };
+  }; // End Call
 
   const endCallUI = () => {
     setStatus("Call Ended");
     setIsConnected(false);
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     currentCallRef.current = null;
-  };
+  }; // UI Update on Call End
 
   const startCamera = async () => {
     try {
@@ -119,7 +129,7 @@ export default function P2PVideo() {
       setStatus("Camera Ready ✅");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setStatus("❌ Camera Denied" + errorMessage);
+      setStatus("❌ Camera Denied: " + errorMessage);
     }
   };
 
