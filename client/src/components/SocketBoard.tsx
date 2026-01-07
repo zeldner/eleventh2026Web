@@ -1,7 +1,6 @@
 // Ilya Zeldner - SocketBoard (With Clear Function)
 import React, { useEffect, useRef } from "react";
-import io from "socket.io-client";
-import { socket } from ".././socket"; // <--- Import from the new file
+import { socket } from "../socket"; // <--- Import from the new file
 interface DrawData {
   x: number;
   y: number;
@@ -17,7 +16,7 @@ export default function SocketBoard() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // 1. LISTEN FOR DRAWING
+    // LISTEN FOR DRAWING
     socket.on("draw_line", (data: DrawData) => {
       ctx.fillStyle = data.color;
       ctx.beginPath();
@@ -25,7 +24,7 @@ export default function SocketBoard() {
       ctx.fill();
     });
 
-    // 2. LISTEN FOR CLEAR (החלק החדש - האזנה לניקוי)
+    // LISTEN FOR CLEAR
     socket.on("clear_board", () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     });
@@ -36,7 +35,7 @@ export default function SocketBoard() {
 
     return () => {
       socket.off("draw_line");
-      socket.off("clear_board"); // ניקוי המאזין
+      socket.off("clear_board");
       socket.off("connect");
     };
   }, []);
@@ -74,16 +73,13 @@ export default function SocketBoard() {
     executeDraw(x, y, ctx);
   };
 
-  // --- הפונקציה החדשה לניקוי הלוח ---
   const handleClear = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // 1. נקה את הלוח שלי
     ctx?.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 2. שלח הודעה לכולם לנקות גם אצלם
     socket.emit("clear_board");
   };
 
@@ -95,7 +91,6 @@ export default function SocketBoard() {
           <p className="text-xs text-gray-500">Pure WebSockets Only</p>
         </div>
 
-        {/* --- הכפתור החדש --- */}
         <button
           onClick={handleClear}
           className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition font-bold border border-red-200"
