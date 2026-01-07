@@ -34,15 +34,14 @@ if (isProduction) {
   }); // Initialize Socket.io Server
 } else {
   console.log("💻 Local Mode: Socket.io on dedicated Port 3002");
-  const socketServer = http.createServer(); // Dedicated Socket.io Server
+  const socketServer = http.createServer(); // Socket.io Server on Port 3002
   io = new Server(socketServer, {
     cors: {
-      origin: (origin, callback) => callback(null, true),
+      origin: (origin, callback) => callback(null, true), // Allow Cross-Origin Resource Sharing
       credentials: true,
-    }, // Allow Cross-Origin Resource Sharing
-    transports: ["websocket"], // Force WebSockets only
-  }); // Initialize Socket.io Server
-  socketServer.listen(3002); // Dedicated Port 3002
+    },
+  });
+  socketServer.listen(3002);
 }
 
 // PEERJS (INITIALIZE SECOND)
