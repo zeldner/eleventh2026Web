@@ -17,132 +17,150 @@ export default function P2PVideo() {
 
   useEffect(() => {
     // CONFIGURATION LOGIC
-    const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001"; // Server URL from .env
+    const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
-    // Extract Hostname (e.g., "myapp.onrender.com" or "localhost")
+    // Extract Hostname
     const cleanHost = rawUrl
       .replace(/^https?:\/\//, "")
       .split("/")[0]
-      .split(":")[0]; // Remove protocol and path
+      .split(":")[0]; // Remove protocol and path from URL to get hostname only
 
-    const isSecure = rawUrl.startsWith("https");
-
-    // On Render (HTTPS), we MUST use Port 443.
-    // On Localhost, we use the port in the URL (3001).
-    const portMatch = rawUrl.match(/:(\d+)/);
-    const port = isSecure ? 443 : portMatch ? parseInt(portMatch[1]) : 3001;
+    const isSecure = rawUrl.startsWith("https"); // Check if URL starts with "https"
+    const portMatch = rawUrl.match(/:(\d+)/); // Extract port from URL
+    const port = isSecure ? 443 : portMatch ? parseInt(portMatch[1]) : 3001; // Default port is 3001 if not specified in URL or secure connection is used (HTTPS)
 
     console.log(
       `Connecting to PeerServer at ${cleanHost}:${port} (Secure: ${isSecure})`
-    ); // Debug
+    );
 
     // PEER INITIALIZATION
     const peer = new Peer("", {
-      host: cleanHost, // Hostname or IP
-      port: port, // Port
-      secure: isSecure, // Use HTTPS
-      path: "/peerjs", // Path to PeerServer endpoint
+      // Empty string for auto-generated ID
+      host: cleanHost, // Hostname for PeerServer
+      port: port, // Port for PeerServer
+      secure: isSecure, // Use secure connection (HTTPS)
+      path: "/peerjs", // Path for PeerServer route
       config: {
         iceServers: [
-          { urls: "stun:stun.l.google.com:19302" }, // Google's STUN server for WebRTC
-          { urls: "stun:stun1.l.google.com:19302" }, // Google's STUN server for WebRTC
+          { urls: "stun:stun.l.google.com:19302" }, // Google STUN server for ICE traversal.
+          { urls: "stun:stun1.l.google.com:19302" },
         ],
       },
-    }); // PeerJS Instance
+    }); // Initialize Peer with PeerServer configuration
 
-    peerRef.current = peer; // Store PeerJS Instance in Ref
+    peerRef.current = peer; // Store the initialized Peer instance in the ref
 
     peer.on("open", (id) => {
       setMyId(id);
       setStatus("Standby - Turn on Camera to Call");
       console.log("✅ Success! My Peer ID:", id);
-    }); // Peer ID is Ready
+    }); // Handle Peer 'open' event to get our Peer ID
 
     peer.on("call", (call) => {
       if (!localStreamRef.current) {
         alert("Someone is calling! Please click 'Turn On Camera' first.");
         return;
       }
-      handleCall(call);
-    }); // Incoming Call Event
+      handleCall(call); // Handle incoming calls from other peers
+    }); // Handle Peer 'call' event to handle incoming calls
 
     peer.on("error", (err) => {
-      console.error("❌ PeerJS Error:", err.type, err); // Error handling
+      console.error("❌ PeerJS Error:", err.type, err);
       if (err.type === "peer-unavailable") {
         setStatus("⚠️ Friend ID not found");
       } else {
         setStatus("⚠️ Network Error");
         setIsConnected(false);
       }
-    }); // Error handling for PeerJS
+    }); // Handle Peer 'error' event
 
     return () => {
-      peer.destroy();
+      peer.destroy(); // Clean up Peer instance
     };
-  }, []); // Peer Initialization
+  }, []); // Initialize Peer on component mount
 
   // UI & CAMERA LOGIC
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current; // Update Local Video UI
+      // If camera is active and local stream is available
+      localVideoRef.current.srcObject = localStreamRef.current; // Update local video source
     }
-  }, [cameraActive]); // Toggle Camera UI Update
+  }, [cameraActive]); // Run whenever cameraActive changes
 
   const handleCall = (call: any) => {
-    if (currentCallRef.current) currentCallRef.current.close(); // Close previous call
-    currentCallRef.current = call; // Store current call
-    setStatus("Connecting..."); // UI Update
-    setIsConnected(true); // UI Update
+    if (currentCallRef.current) currentCallRef.current.close();
+    currentCallRef.current = call; // Store the current call in the ref
+    setStatus("Connecting...");
+    setIsConnected(true);
 
-    call.answer(localStreamRef.current!); // Answer the call
+    call.answer(localStreamRef.current!);
+
     call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
+
+      // "Safe" Video Playback
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream; // Update Remote Video UI
-        remoteVideoRef.current.play().catch(console.error);
-      } // Play Remote Stream
-    });
-    call.on("close", () => endCallUI());
-  }; // Incoming Call
+        // If remote video element is available
+        remoteVideoRef.current.srcObject = remoteStream; // Update remote video source
+
+        const playPromise = remoteVideoRef.current.play(); // Attempt to play the video
+
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            if (error.name === "AbortError") {
+              console.log("Video play aborted (safe to ignore).");
+            } else {
+              console.error("Error playing remote video:", error);
+            }
+          }); // Handle play errors
+        } // Check for play errors
+      } // If remote video element is available
+    }); // Handle remote stream
+
+    call.on("close", () => endCallUI()); // Handle call closure to end the call
+  };
 
   const hangUp = () => {
     if (currentCallRef.current) currentCallRef.current.close();
     endCallUI();
-  }; // End Call
+  }; // Hang up the call
 
   const endCallUI = () => {
     setStatus("Call Ended");
     setIsConnected(false);
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     currentCallRef.current = null;
-  }; // UI Update on Call End
+  }; // End the call UI
 
   const startCamera = async () => {
     try {
       setStatus("Accessing Camera...");
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+        // Access user's media devices (e.g., camera and microphone)
+        video: true, // Request camera access
+        audio: true, // Request microphone access
       });
-      localStreamRef.current = stream; // Store Local Stream
+      // Get user's media stream
+      localStreamRef.current = stream; // Store the local stream in the ref
       setCameraActive(true);
       setStatus("Camera Ready ✅");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setStatus("❌ Camera Denied: " + errorMessage);
     }
-  }; // Camera Access Logic
+  };
 
   const callPeer = () => {
-    if (!peerRef.current || !friendId) return; // If Peer or Friend ID is not found, return
+    // Call another peer
+    if (!peerRef.current || !friendId) return;
     if (!localStreamRef.current) {
       alert("Turn on your camera first!");
       return;
-    }
+    } // If local stream is not available
     setStatus("Calling...");
-    const call = peerRef.current.call(friendId, localStreamRef.current); // Initiate Call
-    handleCall(call); // Start Call
-  }; // Call Logic
+    const call = peerRef.current.call(friendId, localStreamRef.current);
+    handleCall(call); // Handle the call and update UI
+  };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-purple-500 flex flex-col h-[500px]">
@@ -154,7 +172,7 @@ export default function P2PVideo() {
       <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4 flex items-center justify-center">
         <video
           ref={remoteVideoRef}
-          autoPlay
+          // Remove autoPlay to force our manual safe play() logic
           playsInline
           className="w-full h-full object-cover"
         />
