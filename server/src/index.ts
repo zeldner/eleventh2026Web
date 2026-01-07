@@ -99,14 +99,20 @@ io.on("connection", (socket) => {
   socket.on("draw_line", (data) => {
     socket.broadcast.emit("draw_line", data);
   });
+
+  socket.on("clear_board", () => {
+    // Clear Board Event
+    socket.broadcast.emit("clear_board");
+    // emit : Broadcast the event to all connected clients except the sender
+  });
 }); // Socket.IO Events
 
 // KEEP ALIVE & LISTEN
 const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL; // Render Mode
 function keepAlive() {
   if (!SELF_PING_URL) return;
-  const protocol = SELF_PING_URL.startsWith("https") ? https : http;
-  protocol.get(SELF_PING_URL, () => {}).on("error", console.error);
+  const protocol = SELF_PING_URL.startsWith("https") ? https : http; // Determine Protocol
+  protocol.get(SELF_PING_URL, () => {}).on("error", console.error); // Keep-Alive Request
 } // Keep-Alive Function
 
 server.listen(PORT, () => {

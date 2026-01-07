@@ -1,4 +1,4 @@
-// Ilya Zeldner - P2P Video
+// Ilya Zeldner - P2P Video (Final Clean Version)
 import { useState, useEffect, useRef } from "react";
 import Peer from "peerjs";
 
@@ -16,18 +16,21 @@ export default function P2PVideo() {
   const currentCallRef = useRef<any>(null);
 
   useEffect(() => {
-    // CONFIGURATION LOGIC
+    // 1. DYNAMIC URL CONFIGURATION (Works for both Local & Render)
     const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
-    // Extract Hostname
+    // Extract pure hostname (e.g. "myapp.onrender.com")
     const cleanHost = rawUrl
       .replace(/^https?:\/\//, "")
       .split("/")[0]
-      .split(":")[0]; // Remove protocol and path from URL to get hostname only
+      .split(":")[0]; // Remove protocol and path from URL
 
-    const isSecure = rawUrl.startsWith("https"); // Check if URL starts with "https"
-    const portMatch = rawUrl.match(/:(\d+)/); // Extract port from URL
-    const port = isSecure ? 443 : portMatch ? parseInt(portMatch[1]) : 3001; // Default port is 3001 if not specified in URL or secure connection is used (HTTPS)
+    // Detect HTTPS (Render uses HTTPS, Local uses HTTP)
+    const isSecure = rawUrl.startsWith("https");
+
+    // Determine Port (443 for Render/HTTPS, 3001 for Local)
+    const portMatch = rawUrl.match(/:(\d+)/);
+    const port = isSecure ? 443 : portMatch ? parseInt(portMatch[1]) : 3001; // Default to 3001 
 
     console.log(
       `Connecting to PeerServer at ${cleanHost}:${port} (Secure: ${isSecure})`
@@ -35,61 +38,59 @@ export default function P2PVideo() {
 
     // PEER INITIALIZATION
     const peer = new Peer("", {
-      // Empty string for auto-generated ID
-      host: cleanHost, // Hostname for PeerServer
-      port: port, // Port for PeerServer
-      secure: isSecure, // Use secure connection (HTTPS)
-      path: "/peerjs", // Path for PeerServer route
+      host: cleanHost,
+      port: port,
+      secure: isSecure,
+      path: "/peerjs",
       config: {
         iceServers: [
-          { urls: "stun:stun.l.google.com:19302" }, // Google STUN server for ICE traversal.
+          { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
         ],
       },
-    }); // Initialize Peer with PeerServer configuration
+    });
 
-    peerRef.current = peer; // Store the initialized Peer instance in the ref
+    peerRef.current = peer;
 
     peer.on("open", (id) => {
       setMyId(id);
-      setStatus("Standby - Turn on Camera to Call");
-      console.log("✅ Success! My Peer ID:", id);
-    }); // Handle Peer 'open' event to get our Peer ID
+      setStatus("Standby - Share ID manually");
+      console.log("✅ My Peer ID:", id);
+    });
 
     peer.on("call", (call) => {
       if (!localStreamRef.current) {
         alert("Someone is calling! Please click 'Turn On Camera' first.");
         return;
       }
-      handleCall(call); // Handle incoming calls from other peers
-    }); // Handle Peer 'call' event to handle incoming calls
+      handleCall(call);
+    });
 
     peer.on("error", (err) => {
-      console.error("❌ PeerJS Error:", err.type, err);
+      console.error("❌ PeerJS Error:", err);
       if (err.type === "peer-unavailable") {
         setStatus("⚠️ Friend ID not found");
       } else {
         setStatus("⚠️ Network Error");
         setIsConnected(false);
       }
-    }); // Handle Peer 'error' event
+    });
 
     return () => {
-      peer.destroy(); // Clean up Peer instance
+      peer.destroy();
     };
-  }, []); // Initialize Peer on component mount
+  }, []);
 
   // UI & CAMERA LOGIC
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      // If camera is active and local stream is available
-      localVideoRef.current.srcObject = localStreamRef.current; // Update local video source
+      localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [cameraActive]); // Run whenever cameraActive changes
+  }, [cameraActive]);
 
   const handleCall = (call: any) => {
     if (currentCallRef.current) currentCallRef.current.close();
-    currentCallRef.current = call; // Store the current call in the ref
+    currentCallRef.current = call;
     setStatus("Connecting...");
     setIsConnected(true);
 
@@ -98,13 +99,10 @@ export default function P2PVideo() {
     call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
 
-      // "Safe" Video Playback
+      // Safe Video Playback (AbortError Fix)
       if (remoteVideoRef.current) {
-        // If remote video element is available
-        remoteVideoRef.current.srcObject = remoteStream; // Update remote video source
-
-        const playPromise = remoteVideoRef.current.play(); // Attempt to play the video
-
+        remoteVideoRef.current.srcObject = remoteStream;
+        const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch((error) => {
             if (error.name === "AbortError") {
@@ -112,36 +110,34 @@ export default function P2PVideo() {
             } else {
               console.error("Error playing remote video:", error);
             }
-          }); // Handle play errors
-        } // Check for play errors
-      } // If remote video element is available
-    }); // Handle remote stream
+          });
+        }
+      }
+    });
 
-    call.on("close", () => endCallUI()); // Handle call closure to end the call
+    call.on("close", () => endCallUI());
   };
 
   const hangUp = () => {
     if (currentCallRef.current) currentCallRef.current.close();
     endCallUI();
-  }; // Hang up the call
+  };
 
   const endCallUI = () => {
     setStatus("Call Ended");
     setIsConnected(false);
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     currentCallRef.current = null;
-  }; // End the call UI
+  };
 
   const startCamera = async () => {
     try {
       setStatus("Accessing Camera...");
       const stream = await navigator.mediaDevices.getUserMedia({
-        // Access user's media devices (e.g., camera and microphone)
-        video: true, // Request camera access
-        audio: true, // Request microphone access
+        video: true,
+        audio: true,
       });
-      // Get user's media stream
-      localStreamRef.current = stream; // Store the local stream in the ref
+      localStreamRef.current = stream;
       setCameraActive(true);
       setStatus("Camera Ready ✅");
     } catch (err) {
@@ -151,15 +147,14 @@ export default function P2PVideo() {
   };
 
   const callPeer = () => {
-    // Call another peer
     if (!peerRef.current || !friendId) return;
     if (!localStreamRef.current) {
       alert("Turn on your camera first!");
       return;
-    } // If local stream is not available
+    }
     setStatus("Calling...");
     const call = peerRef.current.call(friendId, localStreamRef.current);
-    handleCall(call); // Handle the call and update UI
+    handleCall(call);
   };
 
   return (
@@ -172,7 +167,6 @@ export default function P2PVideo() {
       <div className="bg-black rounded-lg overflow-hidden flex-1 relative mb-4 flex items-center justify-center">
         <video
           ref={remoteVideoRef}
-          // Remove autoPlay to force our manual safe play() logic
           playsInline
           className="w-full h-full object-cover"
         />
@@ -220,7 +214,7 @@ export default function P2PVideo() {
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={friendId}
               onChange={(e) => setFriendId(e.target.value)}
-              placeholder="Friend's ID..."
+              placeholder="Paste Friend's ID..."
             />
             <button
               onClick={callPeer}
