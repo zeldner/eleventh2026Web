@@ -45,7 +45,7 @@ export default function SocketBoard() {
   const executeDraw = (x: number, y: number, ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = "black";
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.arc(x, y, 3, 0, Math.PI * 2); //
     ctx.fill();
     socket.emit("draw_line", { x, y, color: "blue" });
   };
