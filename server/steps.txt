@@ -76,3 +76,79 @@ How the "Ping" Works (The "Espresso Shot")
 The Concept: Free servers like Render go to "sleep" after 15 minutes of inactivity to save electricity. When the first user  joins, they have to wait 30 seconds for the server to "wake up," which looks like a bug.
 
 "Our server is on a free plan, so it likes to take naps. To keep it awake , we programmed a Self-Ping. Every 13 minutes, the server actually sends a 'text message' to itself. Because it stays 'busy' talking to itself, it never naps, and it’s always ready for us to draw on the board instantly."
+
+-----------------------------------------------------------------------------------
+The HTTP Connection (Chat & Database)
+This is the standard "Ask and Answer" protocol. It is used here for saving and loading the chat history from Firebase.
+
+	// 1. Client asks for data (GET)
+	app.get("/api/chat", async (_req, res) => {
+	const s = await db.collection("messages").orderBy("timestamp", "asc").get();
+	res.json(s.docs.map((d) => ({ id: d.id, ...d.data() })));
+	}); 
+
+	// 2. Client sends data (POST)
+	app.post("/api/chat", async (req, res) => {
+	await db.collection("messages").add({ ...req.body, timestamp: new Date() });
+	io.emit("chat-updated"); // <--- Notice this! We mix Socket here to notify others.
+	res.json({ success: true });
+	});
+
+	How it works:
+		Request: The frontend sends a request (like a letter) to api/chat.
+		Process: Our server pauses, talks to Firebase (the database), and gets the documents.
+		Response: Our server sends the JSON back to the frontend and closes the connection. The server forgets the user immediately after.
+
+---------------------------------------------------------------------------------
+The Socket Connection (Drawing)
+	This is the "Always Open Line" protocol. It is used here so that when one person draws a line, it appears instantly on everyone else's screen.
+
+	// This logic creates the "Open Line"
+	if (isProduction) {
+	io = new Server(server, { ... }); // Attached to main server
+	} else {
+	io = new Server(socketServer, { ... }); // Attached to separate port 3002
+	}
+
+	io.on("connection", (socket) => {
+  console.log("⚡ Board Connected:", socket.id);
+  // LISTENER: Wait for a "draw_line" event
+  socket.on("draw_line", (data) => {
+    // BROADCASTER: Shout it to everyone else
+    socket.broadcast.emit("draw_line", data);
+	});
+	});
+
+	How it works:
+		Handshake: The frontend upgrades the HTTP connection to a WebSocket. The line stays open.
+		Event: When User A draws, they emit draw_line with coordinates.
+		Broadcast: The server acts like a mirror. It instantly reflects those coordinates to User B, C, and D. The database is not touched; it is pure speed.
+----------------------------------------------------------------------------------
+The Peer-to-Peer Connection (Video)
+	This is the "Matchmaker" protocol. Our server is only used to introduce the two people.
+
+	// We create the "Switchboard"
+	const peerServer = ExpressPeerServer(server, {
+	path: "/",
+	allow_discovery: true,
+	} as any); 
+
+	// and we open the "Door"
+	app.use("/peerjs", peerServer);
+
+	How it works (In this specific file)
+		The Peer-to-Peer logic is passive. We are not writing the logic; we are simply turning on a machine that does it for us.
+		1. The "Switchboard" 
+			ExpressPeerServer(server, ...): This function is a pre-made "black box" we imported.
+		
+			It creates a mini-application that knows how to generate IDs (the "passcodes") and how to pass messages between users.
+			allow_discovery: true: This specific setting tells the server: "Keep a list in our RAM of everyone who connects." (Without this, the server wouldn't know who is online).
+		2. The "Door" 
+			app.use("/peerjs", peerServer): This tells our main Express server: "If anyone knocks on the door marked /peerjs, don't handle it yourself. Send them straight to the Switchboard (peerServer)."
+		What happens when this code runs:
+			Since we didn't write any custom logic for this part, here is the only thing this code does:
+				It Waits: It sits quietly on the /peerjs route.
+		It Assigns IDs: When a frontend connects to our-url/peerjs, this code automatically generates a random ID (the "passcode") and sends it back. We do not see this in our code because the library does it automatically.
+		If User A sends a signal saying "I want to reach User B," this code looks up User B in its internal list and forwards the packet.
+
+---------------------------------------------------------------------------------

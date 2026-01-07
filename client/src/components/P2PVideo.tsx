@@ -17,7 +17,7 @@ export default function P2PVideo() {
 
   useEffect(() => {
     // CONFIGURATION LOGIC
-    const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+    const rawUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001"; // Server URL from .env
 
     // Extract Hostname (e.g., "myapp.onrender.com" or "localhost")
     const cleanHost = rawUrl
@@ -34,18 +34,18 @@ export default function P2PVideo() {
 
     console.log(
       `Connecting to PeerServer at ${cleanHost}:${port} (Secure: ${isSecure})`
-    );
+    ); // Debug
 
     // PEER INITIALIZATION
     const peer = new Peer("", {
-      host: cleanHost,
-      port: port,
-      secure: isSecure,
-      path: "/peerjs",
+      host: cleanHost, // Hostname or IP
+      port: port, // Port
+      secure: isSecure, // Use HTTPS
+      path: "/peerjs", // Path to PeerServer endpoint
       config: {
         iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun.l.google.com:19302" }, // Google's STUN server for WebRTC
+          { urls: "stun:stun1.l.google.com:19302" }, // Google's STUN server for WebRTC
         ],
       },
     }); // PeerJS Instance
@@ -74,33 +74,33 @@ export default function P2PVideo() {
         setStatus("⚠️ Network Error");
         setIsConnected(false);
       }
-    });
+    }); // Error handling for PeerJS
 
     return () => {
       peer.destroy();
     };
-  }, []);
+  }, []); // Peer Initialization
 
   // UI & CAMERA LOGIC
   useEffect(() => {
     if (cameraActive && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.srcObject = localStreamRef.current; // Update Local Video UI
     }
-  }, [cameraActive]); // Toggle Camera
+  }, [cameraActive]); // Toggle Camera UI Update
 
   const handleCall = (call: any) => {
-    if (currentCallRef.current) currentCallRef.current.close();
-    currentCallRef.current = call;
-    setStatus("Connecting...");
+    if (currentCallRef.current) currentCallRef.current.close(); // Close previous call
+    currentCallRef.current = call; // Store current call
+    setStatus("Connecting..."); // UI Update
     setIsConnected(true); // UI Update
 
-    call.answer(localStreamRef.current!);
+    call.answer(localStreamRef.current!); // Answer the call
     call.on("stream", (remoteStream: MediaStream) => {
       setStatus("🟢 Connected!");
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.srcObject = remoteStream; // Update Remote Video UI
         remoteVideoRef.current.play().catch(console.error);
-      }
+      } // Play Remote Stream
     });
     call.on("close", () => endCallUI());
   }; // Incoming Call
@@ -124,25 +124,25 @@ export default function P2PVideo() {
         video: true,
         audio: true,
       });
-      localStreamRef.current = stream;
+      localStreamRef.current = stream; // Store Local Stream
       setCameraActive(true);
       setStatus("Camera Ready ✅");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setStatus("❌ Camera Denied: " + errorMessage);
     }
-  };
+  }; // Camera Access Logic
 
   const callPeer = () => {
-    if (!peerRef.current || !friendId) return;
+    if (!peerRef.current || !friendId) return; // If Peer or Friend ID is not found, return
     if (!localStreamRef.current) {
       alert("Turn on your camera first!");
       return;
     }
     setStatus("Calling...");
-    const call = peerRef.current.call(friendId, localStreamRef.current);
-    handleCall(call);
-  };
+    const call = peerRef.current.call(friendId, localStreamRef.current); // Initiate Call
+    handleCall(call); // Start Call
+  }; // Call Logic
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-purple-500 flex flex-col h-[500px]">
